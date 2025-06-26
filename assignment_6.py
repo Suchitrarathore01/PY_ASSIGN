@@ -1,13 +1,16 @@
 import pandas as pd
 #question 1 assignment 6
-d=pd.to_datetime(["2025-09-08","2025-09-08","2025-09-08","2025-09-08"])
-print(d)
+import pandas as pd
+date = pd.Series(['2025-06-25 14:30:00', '2025-06-26 15:45:00', '2025-06-27 09:15:00'])
+
+s = pd.to_datetime(date)
+print(s)
 # question 2 of assignment 6
 df1=pd.DataFrame({"car":["aa","cc","bb"],"price":[90,88,66],"id":[1,2,3]})
 df2=pd.DataFrame({"car":["ss","tt","rr"],"price":[56,88,66],"id":[1,2,3]})
 print(df2.merge(df1,how="inner",on='price'))
 print(df2.merge(df1,how="inner",on='id'))
-#print(pd.merge(df1,how="inner",on='id'))
+print(pd.merge(df1,df2,how="inner",on='id'))
 ress=df2.join(df1,rsuffix="_right",lsuffix="_left")
 print(ress)
 #question 3 of assignment 6
