@@ -1,0 +1,185 @@
+mysql> use sec;
+Database changed
+mysql> show tables;
++---------------+
+| Tables_in_sec |
++---------------+
+| members       |
+| menu          |
+| sales         |
++---------------+
+3 rows in set (0.00 sec)
+
+mysql> SELECT customer_id, SUM(price) AS total_spent
+    -> FROM sales
+    -> JOIN menu ON sales.product_id = menu.product_id
+    -> GROUP BY customer_id;
++-------------+-------------+
+| customer_id | total_spent |
++-------------+-------------+
+| A           |          76 |
+| B           |          74 |
+| C           |          36 |
++-------------+-------------+
+3 rows in set (0.04 sec)
+
+mysql> SELECT customer_id, COUNT(DISTINCT order_date) AS visit_days
+    -> FROM sales
+    -> GROUP BY customer_id;
++-------------+------------+
+| customer_id | visit_days |
++-------------+------------+
+| A           |          4 |
+| B           |          6 |
+| C           |          2 |
++-------------+------------+
+3 rows in set (0.00 sec)
+
+mysql> SELECT customer_id, product_name
+    -> FROM (
+    ->   SELECT customer_id, order_date, menu.product_name,
+    ->          RANK() OVER (PARTITION BY customer_id ORDER BY order_date) AS rnk
+    ->   FROM sales
+    ->   JOIN menu ON sales.product_id = menu.product_id
+    -> ) AS ranked
+    -> WHERE rnk = 1;
++-------------+--------------+
+| customer_id | product_name |
++-------------+--------------+
+| A           | sushi        |
+| A           | curry        |
+| B           | curry        |
+| C           | ramen        |
+| C           | ramen        |
++-------------+--------------+
+5 rows in set (0.01 sec)
+
+mysql> SELECT product_name, COUNT(*) AS total_orders
+    -> FROM sales
+    -> JOIN menu ON sales.product_id = menu.product_id
+    -> GROUP BY product_name
+    -> ORDER BY total_orders DESC
+    -> LIMIT 1;
++--------------+--------------+
+| product_name | total_orders |
++--------------+--------------+
+| ramen        |            8 |
++--------------+--------------+
+1 row in set (0.00 sec)
+
+mysql> SELECT customer_id, product_name
+    -> FROM (
+    ->   SELECT customer_id, menu.product_name, COUNT(*) AS order_count,
+    ->          RANK() OVER (PARTITION BY customer_id ORDER BY COUNT(*) DESC) AS rnk
+    ->   FROM sales
+    ->   JOIN menu ON sales.product_id = menu.product_id
+    ->   GROUP BY customer_id, product_name
+    -> ) AS ranked
+    -> WHERE rnk = 1;
++-------------+--------------+
+| customer_id | product_name |
++-------------+--------------+
+| A           | ramen        |
+| B           | curry        |
+| B           | sushi        |
+| B           | ramen        |
+| C           | ramen        |
++-------------+--------------+
+5 rows in set (0.00 sec)
+
+mysql> SELECT s.customer_id, m.join_date, s.order_date, menu.product_name
+    -> FROM sales s
+    -> JOIN members m ON s.customer_id = m.customer_id
+    -> JOIN menu ON s.product_id = menu.product_id
+    -> WHERE s.order_date >= m.join_date
+    -> AND s.order_date = (
+    ->   SELECT MIN(s2.order_date)
+    ->   FROM sales s2
+    ->   WHERE s2.customer_id = s.customer_id
+    ->     AND s2.order_date >= m.join_date
+    -> );
++-------------+------------+------------+--------------+
+| customer_id | join_date  | order_date | product_name |
++-------------+------------+------------+--------------+
+| B           | 2021-01-09 | 2021-01-11 | sushi        |
+| A           | 2021-01-07 | 2021-01-07 | curry        |
++-------------+------------+------------+--------------+
+2 rows in set (0.01 sec)
+
+mysql> SELECT s.customer_id, s.order_date, m.join_date, menu.product_name
+    -> FROM sales s
+    -> JOIN members m ON s.customer_id = m.customer_id
+    -> JOIN menu ON s.product_id = menu.product_id
+    -> WHERE s.order_date < m.join_date
+    -> AND s.order_date = (
+    ->   SELECT MAX(s2.order_date)
+    ->   FROM sales s2
+    ->   WHERE s2.customer_id = s.customer_id
+    ->     AND s2.order_date < m.join_date
+    -> );
++-------------+------------+------------+--------------+
+| customer_id | order_date | join_date  | product_name |
++-------------+------------+------------+--------------+
+| B           | 2021-01-04 | 2021-01-09 | sushi        |
+| A           | 2021-01-01 | 2021-01-07 | sushi        |
+| A           | 2021-01-01 | 2021-01-07 | curry        |
++-------------+------------+------------+--------------+
+3 rows in set (0.00 sec)
+
+mysql> SELECT s.customer_id,
+    ->        COUNT(*) AS total_items,
+    ->        SUM(menu.price) AS total_spent
+    -> FROM sales s
+    -> JOIN members m ON s.customer_id = m.customer_id
+    -> JOIN menu ON s.product_id = menu.product_id
+    -> WHERE s.order_date < m.join_date
+    -> GROUP BY s.customer_id;
++-------------+-------------+-------------+
+| customer_id | total_items | total_spent |
++-------------+-------------+-------------+
+| B           |           3 |          40 |
+| A           |           2 |          25 |
++-------------+-------------+-------------+
+2 rows in set (0.00 sec)
+
+mysql> SELECT s.customer_id,
+    ->        SUM(
+    ->          CASE
+    ->            WHEN menu.product_name = 'sushi' THEN menu.price * 20
+    ->            ELSE menu.price * 10
+    ->          END
+    ->        ) AS total_points
+    -> FROM sales s
+    -> JOIN menu ON s.product_id = menu.product_id
+    -> GROUP BY s.customer_id;
++-------------+--------------+
+| customer_id | total_points |
++-------------+--------------+
+| A           |          860 |
+| B           |          940 |
+| C           |          360 |
++-------------+--------------+
+3 rows in set (0.00 sec)
+
+mysql> SELECT s.customer_id,
+    ->        SUM(
+    ->          CASE
+    ->            WHEN s.order_date BETWEEN m.join_date AND DATE_ADD(m.join_date, INTERVAL 6 DAY)
+    ->              THEN menu.price * 20
+    ->            WHEN menu.product_name = 'sushi'
+    ->              THEN menu.price * 20
+    ->            ELSE menu.price * 10
+    ->          END
+    ->        ) AS bonus_points
+    -> FROM sales s
+    -> JOIN members m ON s.customer_id = m.customer_id
+    -> JOIN menu ON s.product_id = menu.product_id
+    -> WHERE s.order_date <= '2021-01-31'
+    -> GROUP BY s.customer_id;
++-------------+--------------+
+| customer_id | bonus_points |
++-------------+--------------+
+| B           |          820 |
+| A           |         1370 |
++-------------+--------------+
+2 rows in set (0.01 sec)
